@@ -1,0 +1,7 @@
+packages:
+ - "plugins/*"
+
+# esbuild downloads its binary in an install script; pnpm blocks those by default
+# and the install (and the GitHub release build) fails without this.
+allowBuilds:
+  esbuild: true
