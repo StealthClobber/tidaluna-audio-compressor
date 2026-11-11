@@ -48,34 +48,6 @@ or the plugin directly:
 ```
 https://github.com/StealthClobber/tidaluna-audio-compressor/releases/download/latest/luna.audio-compressor
 ```
-
-These links only work while the repo is public.
-
-## Development
-
-Requires Node.js and pnpm (`npm install -g pnpm`).
-
-```sh
-pnpm install
-pnpm run watch
-```
-
-`watch` rebuilds on every change and serves the plugin at `http://localhost:3000`. Install it from the **DEV** store under **Luna Settings → Plugin Store**, and turn on live reload on its card to pick up changes automatically.
-
-Source is in `plugins/AudioCompressor/src`:
-
-| File | Purpose |
-| --- | --- |
-| `index.ts` | Startup, following the player, volume bar as Gain. |
-| `player.ts` | Finds Tidal's player SDK and switches between the native and browser players. |
-| `audio.ts` | Web Audio graph (compressor and gain) and the per-element volume correction. |
-| `button.ts` | The player bar toggle button. |
-| `volumeText.ts` | HorizontalVolumeSlider number box integration. |
-| `Settings.tsx` | Settings page. |
-| `defaults.ts` | Default values and slider ranges. |
-
-Pushing to the default branch builds the plugin with GitHub Actions and publishes it to the `latest` release. That needs **Settings → Actions → General → Workflow permissions** set to **Read and write permissions**.
-
 ## License
 
 [AGPL-3.0](LICENSE), from the [luna-template](https://github.com/Inrixia/luna-template).
