@@ -1,0 +1,14 @@
+{
+	"name": "@luna/audio-compressor",
+	"description": "Evens out loud and quiet parts of tracks with a dynamics compressor. Switches Tidal to its browser player so the audio can be processed.",
+	"author": {
+		"name": "StealthClobber"
+	},
+	"main": "./src/index.ts",
+	"type": "module",
+	"dependencies": {
+		"@emotion/react": "^11.14.0",
+		"@emotion/styled": "^11.14.1",
+		"@mui/material": "^9.3.1"
+	}
+}
