@@ -14,6 +14,9 @@ jobs:
   name: Release latest on GitHub
   needs: Build
   runs-on: ubuntu-latest
+  # Creating the release needs write access, whatever the repo's default token permissions are.
+  permissions:
+   contents: write
 
   steps:
    - name: Download All Artifacts
