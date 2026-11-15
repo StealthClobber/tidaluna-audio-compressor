@@ -2,6 +2,17 @@
 
 A [Tidal Luna](https://github.com/Inrixia/TidaLuna) plugin that runs Tidal's audio through a dynamics compressor, evening out loud and quiet parts of tracks. The defaults match the audio compressor in the FrankerFaceZ Twitch add-on.
 
+## Installing
+
+Install from this repo's latest release by adding the store link in **Luna Settings → Plugin Store**:
+
+```
+https://github.com/StealthClobber/tidaluna-audio-compressor/releases/download/latest/store.json
+```
+
+2. The store appears in the list. Click **@luna/audio-compressor** in it to install.
+
+
 ## Features
 
 - **Compressor** with adjustable threshold, knee, ratio, attack, release and gain.
@@ -35,19 +46,6 @@ Open **Luna Settings → Plugins** and expand **@luna/audio-compressor**:
 | Attack | 0 s | Time taken to turn the volume down by 10 dB. |
 | Release | 0.25 s | Time taken to turn the volume back up by 10 dB. |
 
-## Installing
-
-Install from this repo's latest release by adding the store link in **Luna Settings → Plugin Store**:
-
-```
-https://github.com/StealthClobber/tidaluna-audio-compressor/releases/download/latest/store.json
-```
-
-or the plugin directly:
-
-```
-https://github.com/StealthClobber/tidaluna-audio-compressor/releases/download/latest/luna.audio-compressor
-```
 ## License
 
 [AGPL-3.0](LICENSE), from the [luna-template](https://github.com/Inrixia/luna-template).
