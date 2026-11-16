@@ -10,7 +10,7 @@ Install from this repo's latest release by adding the store link in **Luna Setti
 https://github.com/StealthClobber/tidaluna-audio-compressor/releases/download/latest/store.json
 ```
 
-2. The store appears in the list. Click **@luna/audio-compressor** in it to install.
+2. The store appears in the list. Click **@stealth/audio-compressor** in it to install.
 
 
 ## Features
@@ -33,7 +33,7 @@ Things to know:
 
 ## Settings
 
-Open **Luna Settings → Plugins** and expand **@luna/audio-compressor**:
+Open **Luna Settings → Plugins** and expand **@stealth/audio-compressor**:
 
 | Setting | Default | What it does |
 | --- | --- | --- |

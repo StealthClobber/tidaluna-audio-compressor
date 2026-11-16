@@ -1,5 +1,5 @@
 {
-	"name": "@luna/audio-compressor",
+	"name": "@stealth/audio-compressor",
 	"description": "Evens out loud and quiet parts of tracks with a dynamics compressor. Switches Tidal to its browser player so the audio can be processed.",
 	"author": {
 		"name": "StealthClobber"
