@@ -2,9 +2,19 @@ import type { CompressorSettings } from "./defaults";
 
 interface Graph {
 	source: MediaElementAudioSourceNode;
+	/** Whether the source feeds the compressor (true) or goes straight out (false); null until routed. */
+	on: boolean | null;
+}
+
+/**
+ * One compressor and gain stage shared by every element. Tidal alternates
+ * between two elements for gapless playback; with a compressor each, the new
+ * track's compressor started from rest and its makeup gain let the first
+ * moment through too loud. A shared one carries on from the previous track.
+ */
+interface Chain {
 	compressor: DynamicsCompressorNode;
 	gain: GainNode;
-	on: boolean | null;
 }
 
 // createMediaElementSource() can only ever be called once per element, and the
@@ -15,6 +25,9 @@ interface Graph {
 interface Shared {
 	context?: AudioContext;
 	graphs: Map<HTMLMediaElement, Graph>;
+	chain?: Chain;
+	/** HTMLMediaElement.prototype.play before hookOnPlay() wrapped it. */
+	play?: HTMLMediaElement["play"];
 	blocked: WeakSet<HTMLMediaElement>;
 	/** The output device last handed to the context, so it's only switched when it really changes. */
 	sinkId?: string;
@@ -68,7 +81,10 @@ export const setVolumeMode = (override: boolean, level: number) => {
 	for (const element of shared.graphs.keys()) applyVolume(element);
 };
 
-type SinkContext = AudioContext & { setSinkId?: (id: string) => Promise<void> };
+type SinkContext = AudioContext & { sinkId?: string | object; setSinkId?: (id: string) => Promise<void> };
+
+/** The context's sinkId is an object when it outputs nowhere; treat that as the default device. */
+const normalizeSink = (id: string | object | undefined) => (typeof id !== "string" || id === "default" ? "" : id);
 type SinkElement = HTMLMediaElement & { sinkId?: string };
 
 const getContext = (): SinkContext => {
@@ -78,20 +94,36 @@ const getContext = (): SinkContext => {
 	return shared.context;
 };
 
-const applyParameters = (graph: Graph, s: CompressorSettings) => {
-	graph.compressor.threshold.value = s.threshold;
-	graph.compressor.knee.value = s.knee;
-	graph.compressor.ratio.value = s.ratio;
-	graph.compressor.attack.value = s.attack;
-	graph.compressor.release.value = s.release;
-	graph.gain.gain.value = s.gain / 100;
+const getChain = () => {
+	if (!shared.chain) {
+		const audio = getContext();
+		const compressor = audio.createDynamicsCompressor();
+		const gain = audio.createGain();
+		compressor.connect(gain);
+		gain.connect(audio.destination);
+		shared.chain = { compressor, gain };
+	}
+	return shared.chain;
+};
+
+// Older versions of the plugin gave each element its own compressor. Forget
+// how those elements were routed so applyAll() moves them onto the shared one.
+for (const graph of shared.graphs.values()) graph.on = null;
+
+const applyParameters = (s: CompressorSettings) => {
+	const { compressor, gain } = getChain();
+	compressor.threshold.value = s.threshold;
+	compressor.knee.value = s.knee;
+	compressor.ratio.value = s.ratio;
+	compressor.attack.value = s.attack;
+	compressor.release.value = s.release;
+	gain.gain.value = s.gain / 100;
 };
 
 const route = (graph: Graph, on: boolean) => {
 	if (graph.on === on) return;
-	const destination = getContext().destination;
 	graph.source.disconnect();
-	graph.source.connect(on ? graph.compressor : destination);
+	graph.source.connect(on ? getChain().compressor : getContext().destination);
 	graph.on = on;
 };
 
@@ -114,14 +146,10 @@ export const hook = (element: HTMLMediaElement, s: CompressorSettings, on: boole
 		shared.blocked.add(element);
 		throw error;
 	}
-	const compressor = audio.createDynamicsCompressor();
-	const gain = audio.createGain();
-	compressor.connect(gain);
-	gain.connect(audio.destination);
-	const graph: Graph = { source, compressor, gain, on: null };
+	const graph: Graph = { source, on: null };
 	shared.graphs.set(element, graph);
 	applyVolume(element);
-	applyParameters(graph, s);
+	applyParameters(s);
 	route(graph, on);
 	return "ok";
 };
@@ -133,10 +161,30 @@ export const releaseVolume = () => {
 };
 
 export const applyAll = (s: CompressorSettings, on: boolean) => {
-	for (const graph of shared.graphs.values()) {
-		applyParameters(graph, s);
-		route(graph, on);
-	}
+	applyParameters(s);
+	for (const graph of shared.graphs.values()) route(graph, on);
+};
+
+/**
+ * Call onPlay just before a not-yet-hooked element starts playing. Hooking
+ * an element while it plays reroutes its audio mid-stream, which hitches; the
+ * player's second (gapless) element is otherwise only found once it's playing.
+ * Only MediaSource (blob:) elements count: that's how Tidal's player streams
+ * (through a <source> child, so check currentSrc rather than src).
+ */
+export const hookOnPlay = (onPlay: (element: HTMLMediaElement) => void) => {
+	const original = (shared.play ??= HTMLMediaElement.prototype.play);
+	HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+		try {
+			if (!shared.graphs.has(this) && !shared.blocked.has(this) && this.currentSrc.startsWith("blob:")) onPlay(this);
+		} catch {
+			// Never stop the track from playing.
+		}
+		return original.call(this);
+	};
+	return () => {
+		HTMLMediaElement.prototype.play = original;
+	};
 };
 
 export const isHooked = (element: HTMLMediaElement) => shared.graphs.has(element);
@@ -146,11 +194,16 @@ export const isHooked = (element: HTMLMediaElement) => shared.graphs.has(element
  * so mirror the playing element's device onto the context. Switching devices
  * reopens the audio output, so only do it when the element's device changes.
  */
-export const syncOutput = (element: SinkElement) => {
+export const syncOutput = (element: SinkElement, starting = false) => {
 	const audio = getContext();
-	if (audio.state === "suspended" && !element.paused) audio.resume().catch(() => {});
-	const sinkId = element.sinkId;
-	if (typeof audio.setSinkId !== "function" || sinkId === undefined || sinkId === shared.sinkId) return;
+	if (audio.state === "suspended" && (starting || !element.paused)) audio.resume().catch(() => {});
+	if (typeof audio.setSinkId !== "function" || element.sinkId === undefined) return;
+	// "" and "default" both mean the default device, and Tidal's two elements
+	// don't agree on which they report. Treating them as different reopened the
+	// output (about 100 ms of silence) at the start of every other track.
+	const sinkId = normalizeSink(element.sinkId);
+	const current = normalizeSink(audio.sinkId ?? shared.sinkId);
+	if (sinkId === current) return;
 	shared.sinkId = sinkId;
 	audio.setSinkId(sinkId).catch(() => {});
 };

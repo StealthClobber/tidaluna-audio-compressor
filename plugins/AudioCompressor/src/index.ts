@@ -1,7 +1,7 @@
 import { interceptors, ReactiveStore, Tracer, type LunaUnload } from "@luna/core";
 import { MediaItem, redux } from "@luna/lib";
 
-import { applyAll, hook, releaseVolume, setVolumeMode, syncOutput, type HookResult } from "./audio";
+import { applyAll, hook, hookOnPlay, releaseVolume, setVolumeMode, syncOutput, type HookResult } from "./audio";
 import { mountButtons, updateButtons } from "./button";
 import { mountVolumeText, updateVolumeText } from "./volumeText";
 import { DEFAULTS } from "./defaults";
@@ -192,10 +192,18 @@ redux.intercept("playbackControls/SET_PLAYBACK_STATE", unloads, () => {
 	// Let the SDK swap elements first (gapless playback alternates two).
 	setTimeout(() => sync().catch(trace.err.withContext("sync")), 50);
 });
+// Hook the player's next element before it starts, not after.
+unloads.add(
+	hookOnPlay((element) => {
+		if (switching || status.error || activePlayerName() !== "shakaPlayer") return;
+		if (hook(element, settings(), storage.enabled) === "ok") syncOutput(element, true);
+	}),
+);
 const timer = setInterval(() => sync().catch(trace.err.withContext("sync")), 1000);
 unloads.add(() => clearInterval(timer));
 
 mountButtons(unloads, () => storage.enabled, toggleCompressor);
+applyAll(settings(), storage.enabled);
 if (!status.error) updateVolumeMode();
 sync().catch(trace.err.withContext("sync"));
 
